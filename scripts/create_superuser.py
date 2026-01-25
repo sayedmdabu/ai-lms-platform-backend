@@ -1,4 +1,3 @@
-# File: backend/scripts/create_superuser.py
 import asyncio
 import sys
 import os
@@ -8,6 +7,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import AsyncSessionLocal
 from app.models.user import User
+# 👇 এই লাইনটি যোগ করুন (এটিই আপনার এরর সমাধান করবে)
+from app.models.course import Course 
 from app.core.security import get_password_hash
 
 async def create_superuser():

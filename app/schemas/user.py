@@ -29,3 +29,11 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+        
+class UserUpdateAdmin(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+    role: Optional[str] = None       # অ্যাডমিন রোল চেঞ্জ করতে পারবে
+    is_active: Optional[bool] = None # অ্যাডমিন ব্লক/আনব্লক করতে পারবে
+    is_verified: Optional[bool] = None

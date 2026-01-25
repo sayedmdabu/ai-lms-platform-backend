@@ -24,5 +24,5 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Future relationships placeholders (Uncomment when creating those models)
-    # courses_created = relationship("Course", back_populates="instructor")
+    courses = relationship("Course", back_populates="instructor")
     # enrollments = relationship("Enrollment", back_populates="student")

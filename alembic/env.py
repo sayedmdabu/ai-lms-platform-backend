@@ -1,4 +1,3 @@
-# File: backend/alembic/env.py
 import asyncio
 from logging.config import fileConfig
 
@@ -12,7 +11,12 @@ from alembic import context
 # আমাদের কনফিগারেশন এবং মডেলগুলো ইমপোর্ট করছি
 from app.core.config import settings
 from app.core.database import Base
-from app.models.user import User  # User মডেল অবশ্যই ইমপোর্ট করতে হবে
+
+# সব মডেল অবশ্যই এখানে ইমপোর্ট করতে হবে যাতে Alembic মেটাডাটা চিনতে পারে
+from app.models.user import User
+from app.models.course import Course  # <--- এই লাইনটি যোগ করুন
+
+# ভবিষ্যতে আরও মডেল আসলে এখানে যোগ করতে হবে (যেমন: Lesson, Module)
 # ----------------- CUSTOM IMPORTS END -------------------
 
 # Alembic Config অবজেক্ট
@@ -25,8 +29,7 @@ if config.config_file_name is not None:
 # টার্গেট মেটাডাটা সেট করা (যাতে Alembic টেবিল চিনতে পারে)
 target_metadata = Base.metadata
 
-# .env থেকে ডাটাবেস URL নেওয়া
-# আমরা settings.DATABASE_URL ব্যবহার করছি যাতে কোডে হার্ডকোড না থাকে
+# .env থেকে ডাটাবেস URL নেওয়া
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 def run_migrations_offline() -> None:

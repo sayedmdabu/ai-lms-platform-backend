@@ -1,19 +1,36 @@
-# File: backend/app/schemas/auth.py
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from app.schemas.user import UserCreate
 
+# Token response schema
 class Token(BaseModel):
     access_token: str
     token_type: str
 
+# Token data decode schema
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+# Login request schema
 class Login(BaseModel):
-    username: str  # OAuth2 standard এ ইমেইলকেও username বলা হয়
+    username: str  # In OAuth2 standard, email is often used as username
     password: str
-    
-# রেজিস্ট্রেশন স্কিমা UserCreate কেই ব্যবহার করবে, তবে আলাদা নাম দেওয়া হলো স্বচ্ছতার জন্য
+
+# Registration schema (Inherits from UserCreate)
 class UserRegister(UserCreate):
     pass
+
+# 👇 NEW SCHEMAS FOR PASSWORD RESET & VERIFICATION
+
+# 1. Password reset request (User sends email)
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+# 2. Confirm password reset (User sends token + new password)
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str
+
+# 3. Email verification request
+class EmailVerificationRequest(BaseModel):
+    token: str

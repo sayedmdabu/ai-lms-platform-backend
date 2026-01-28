@@ -3,7 +3,7 @@ from pydantic import EmailStr
 from app.core.config import settings
 from typing import List
 
-# ইমেইল কনফিগারেশন সেটআপ
+# Email Configuration Setup
 conf = ConnectionConfig(
     MAIL_USERNAME=settings.MAIL_USERNAME,
     MAIL_PASSWORD=settings.MAIL_PASSWORD,
@@ -18,16 +18,16 @@ conf = ConnectionConfig(
 
 class EmailService:
     async def send_verification_email(self, email: List[EmailStr], token: str):
-        """ভেরিফিকেশন ইমেইল পাঠানো"""
-        # প্রোডাকশনে ফ্রন্টএন্ড URL ব্যবহার করবেন
-        verify_url = f"http://localhost:3000/auth/verify-email?token={token}"
+        """Send account verification email"""
+        # In production, use your frontend URL
+        verify_url = f"http://localhost:8000/auth/verify-email?token={token}"
         
         html = f"""
         <h3>Welcome to AI LMS!</h3>
         <p>Please verify your email by clicking the link below:</p>
         <a href="{verify_url}">Verify Email</a>
         <br>
-        <p>Or copy this token: {token}</p>
+        <p>Or copy this token: <b>{token}</b></p>
         """
 
         message = MessageSchema(
@@ -41,8 +41,8 @@ class EmailService:
         await fm.send_message(message)
 
     async def send_password_reset_email(self, email: List[EmailStr], token: str):
-        """পাসওয়ার্ড রিসেট ইমেইল পাঠানো"""
-        reset_url = f"http://localhost:3000/auth/reset-password?token={token}"
+        """Send password reset email"""
+        reset_url = f"http://localhost:8000/auth/reset-password?token={token}"
         
         html = f"""
         <h3>Password Reset Request</h3>

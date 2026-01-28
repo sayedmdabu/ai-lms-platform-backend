@@ -1,4 +1,3 @@
-# File: backend/app/api/v1/endpoints/auth.py
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +10,7 @@ from app.models.user import User
 from app.schemas.auth import Token, UserRegister, PasswordResetRequest, PasswordResetConfirm, EmailVerificationRequest
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
-from app.services.email_service import EmailService  # নতুন ইমপোর্ট
+from app.services.email_service import EmailService
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash
 
@@ -24,10 +23,21 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    নতুন ইউজার রেজিস্ট্রেশন API
+    Register a new user.
     """
     auth_service = AuthService(db)
-    return await auth_service.register_user(user_data)
+    user = await auth_service.register_user(user_data)
+    
+    # Create verification token (valid for 24 hours)
+    verify_token = create_access_token(
+        data={"sub": user.email, "type": "verification"},
+        expires_delta=timedelta(hours=24)
+    )
+    
+    # Send verification email in background (uncomment to enable)
+    # await email_service.send_verification_email([user.email], verify_token)
+    
+    return user
 
 @router.post("/login", response_model=Token)
 async def login(
@@ -35,7 +45,7 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    লগইন API (এটি অ্যাক্সেস টোকেন রিটার্ন করে)
+    Login user and return JWT token.
     """
     auth_service = AuthService(db)
     user = await auth_service.authenticate_user(form_data.username, form_data.password)
@@ -43,44 +53,41 @@ async def login(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # টোকেন তৈরি
+        
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "id": str(user.id)},
-        expires_delta=access_token_expires
+        data={"sub": user.email}, expires_delta=access_token_expires
     )
-    
     return {"access_token": access_token, "token_type": "bearer"}
+
+# 👇 NEW ENDPOINTS
 
 @router.post("/forgot-password", status_code=200)
 async def forgot_password(
     data: PasswordResetRequest,
-    background_tasks: BackgroundTasks, # ইমেইল ব্যাকগ্রাউন্ডে পাঠানোর জন্য
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db)
 ):
     """
-    ১. পাসওয়ার্ড ভুলে গেলে এই API কল হবে।
-    ২. এটি একটি রিসেট টোকেন জেনারেট করে ইমেইলে পাঠিয়ে দেবে।
+    Request password reset link.
     """
-    # ইউজার চেক করা
     result = await db.execute(select(User).filter(User.email == data.email))
     user = result.scalars().first()
     
+    # We return success even if user doesn't exist to prevent email enumeration
     if not user:
-        # সিকিউরিটির জন্য আমরা বলব না যে ইউজার নেই, যাতে হ্যাকাররা ইমেইল চেক করতে না পারে
         return {"message": "If the email exists, a reset link has been sent."}
 
-    # পাসওয়ার্ড রিসেট টোকেন তৈরি (শর্ট লাইফটাইম, যেমন ১৫ মিনিট)
+    # Generate reset token (valid for 15 mins)
     reset_token = create_access_token(
         data={"sub": user.email, "type": "reset"},
         expires_delta=timedelta(minutes=15)
     )
     
-    # ব্যাকগ্রাউন্ডে ইমেইল পাঠানো
+    # Send email in background
     background_tasks.add_task(
         email_service.send_password_reset_email, 
         [data.email], 
@@ -95,11 +102,9 @@ async def reset_password(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    ১. ইমেইলে পাওয়া টোকেন এবং নতুন পাসওয়ার্ড দিয়ে এই API কল হবে।
-    ২. এটি পাসওয়ার্ড ভেরিফাই এবং আপডেট করবে।
+    Set new password using the token received in email.
     """
     try:
-        # টোকেন ডিকোড করা
         payload = jwt.decode(
             data.token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
@@ -112,14 +117,13 @@ async def reset_password(
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
         
-    # ইউজার খুঁজে বের করা
     result = await db.execute(select(User).filter(User.email == email))
     user = result.scalars().first()
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # নতুন পাসওয়ার্ড সেট করা
+    # Update password
     user.hashed_password = get_password_hash(data.new_password)
     db.add(user)
     await db.commit()
@@ -132,14 +136,14 @@ async def verify_email(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    ইমেইল ভেরিফিকেশন API
+    Verify email address using token.
     """
     try:
         payload = jwt.decode(
             data.token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         email = payload.get("sub")
-        # এখানে চাইলে টোকেন টাইপ চেক করতে পারেন যদি আলাদা টোকেন জেনারেট করেন
+        # You can add token_type check here if you want stricter validation
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
         

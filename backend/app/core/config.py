@@ -19,15 +19,15 @@ class Settings(BaseSettings):
     # CORS
     BACKEND_CORS_ORIGINS: List[str] = []
     
-    # 👇 EMAIL CONFIGURATION (নতুন যোগ করুন)
+    # 👇 EMAIL CONFIGURATION ADDED
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
-    MAIL_PORT: int = 587
+    MAIL_PORT: int = 465
     MAIL_SERVER: str
     MAIL_FROM_NAME: str = "AI LMS Support"
-    MAIL_STARTTLS: bool = True
-    MAIL_SSL_TLS: bool = False
+    MAIL_STARTTLS: bool = False
+    MAIL_SSL_TLS: bool = True
     USE_CREDENTIALS: bool = True
     VALIDATE_CERTS: bool = True
     

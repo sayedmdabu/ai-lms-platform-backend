@@ -7,7 +7,7 @@ from jose import jwt, JWTError
 
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.auth import Token, UserRegister, PasswordResetRequest, PasswordResetConfirm, EmailVerificationRequest
+from app.schemas.auth import Token, UserRegister, PasswordResetRequest, PasswordResetConfirm
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
@@ -34,7 +34,7 @@ async def register(
         expires_delta=timedelta(hours=24)
     )
     
-    # Send verification email in background (uncomment to enable)
+    # Send verification email in background
     await email_service.send_verification_email([user.email], verify_token)
     
     return user
@@ -63,7 +63,6 @@ async def login(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# 👇 NEW ENDPOINTS
 
 @router.post("/forgot-password", status_code=200)
 async def forgot_password(
@@ -77,7 +76,7 @@ async def forgot_password(
     result = await db.execute(select(User).filter(User.email == data.email))
     user = result.scalars().first()
     
-    # We return success even if user doesn't exist to prevent email enumeration
+    # Return success even if user doesn't exist to prevent email enumeration
     if not user:
         return {"message": "If the email exists, a reset link has been sent."}
 
@@ -95,6 +94,7 @@ async def forgot_password(
     )
     
     return {"message": "If the email exists, a reset link has been sent."}
+
 
 @router.post("/reset-password", status_code=200)
 async def reset_password(
@@ -130,34 +130,73 @@ async def reset_password(
     
     return {"message": "Password has been reset successfully."}
 
-@router.post("/verify-email", status_code=200)
+
+# ✅ FIXED: Changed to GET and accepts token as query parameter
+@router.get("/verify-email", status_code=200)
 async def verify_email(
-    data: EmailVerificationRequest,
+    token: str,  # ✅ Query parameter
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Verify email address using token.
+    Verify email address using token from query parameter.
+    Frontend will call: GET /auth/verify-email?token=xyz
     """
     try:
+        # Decode JWT token
         payload = jwt.decode(
-            data.token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
         email = payload.get("sub")
-        # You can add token_type check here if you want stricter validation
-    except JWTError:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        token_type = payload.get("type")
         
+        # Validate token type (optional but recommended)
+        if email is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Invalid token"
+            )
+            
+        # Optional: Check token type for extra security
+        if token_type != "verification":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid token type"
+            )
+    except JWTError as e:
+        print(f"❌ JWT Error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+        
+    # Find user by email
     result = await db.execute(select(User).filter(User.email == email))
     user = result.scalars().first()
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
         
+    # Check if already verified
     if user.is_verified:
-        return {"message": "Email already verified."}
+        return {
+            "success": True,
+            "message": "Email already verified",
+            "email": user.email
+        }
         
+    # Update verification status
     user.is_verified = True
     db.add(user)
     await db.commit()
+    await db.refresh(user)
     
-    return {"message": "Email verified successfully."}
+    print(f"✅ Email verified for user: {user.email}")
+    
+    return {
+        "success": True,
+        "message": "Email verified successfully",
+        "email": user.email
+    }

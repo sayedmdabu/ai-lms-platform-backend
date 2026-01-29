@@ -35,7 +35,7 @@ async def register(
     )
     
     # Send verification email in background (uncomment to enable)
-    # await email_service.send_verification_email([user.email], verify_token)
+    await email_service.send_verification_email([user.email], verify_token)
     
     return user
 

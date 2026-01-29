@@ -26,7 +26,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: any) => {
     setIsLoading(true);
     try {
-      await api.post('/api/v1/auth/register', {
+      await api.post('auth/register', {
         email: data.email,
         username: data.username,
         password: data.password,
